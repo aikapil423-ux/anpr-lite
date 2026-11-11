@@ -208,7 +208,7 @@ window.KARNAL_CAMERA_MODE = true;
         const dialog = document.createElement('dialog');
         dialog.id = 'knlCameraDialog';
         dialog.className = 'knl-map-dialog';
-        dialog.innerHTML = `<header><h3 id="knlCameraDialogTitle">Karnal camera locations</h3><button type="button" id="knlCloseMap" aria-label="Close camera map">Close</button></header><p class="knl-caption">${registry.site_count} locations · ${registry.count} numbered cameras · ICCC-KNL<br>Names and site GPS imported from your Google My Maps. Camera numbering is local; individual GPS/direction and live-feed URLs were not supplied.</p><div id="knlMapPickerHost"></div><div id="knlSiteMap"></div><p class="knl-caption">Select a camera in the list or click a site pin. No camera or location is chosen automatically.</p><button type="button" id="knlConfirmCamera">Use this camera for file</button>`;
+        dialog.innerHTML = `<header><h3 id="knlCameraDialogTitle">Karnal camera locations</h3><div style="display:flex;gap:8px;align-items:center;"><a href="/static/camera_map.html" target="_blank" class="knl-map-button" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:13px;color:#ffffff!important;background:#2563eb!important;font-weight:600;padding:8px 14px;border-radius:6px;" title="Open in new full screen page"><span>⛶ Full Screen Page</span></a><button type="button" id="knlCloseMap" aria-label="Close camera map">Close</button></div></header><p class="knl-caption">${registry.site_count} locations · ${registry.count} numbered cameras · ICCC-KNL<br>Names and site GPS imported from your Google My Maps. Camera numbering is local; individual GPS/direction and live-feed URLs were not supplied.</p><div id="knlMapPickerHost"></div><div id="knlSiteMap"></div><p class="knl-caption">Select a camera in the list or click a site pin. No camera or location is chosen automatically.</p><button type="button" id="knlConfirmCamera">Use this camera for file</button>`;
         document.body.append(dialog);
         document.getElementById('knlMapPickerHost').append(picker('knlMapCamera','Registered Karnal camera', camera => {
             if (!camera || !cameraMap) return;
@@ -230,10 +230,13 @@ window.KARNAL_CAMERA_MODE = true;
         window.closeLocationPickerModal = () => dialog.close();
 
         const nav = document.getElementById('navMasterTrailBtn');
-        const mapButton = document.createElement('button');
-        mapButton.type = 'button';mapButton.className = 'sidebar-nav-item';mapButton.id = 'knlCameraMapButton';
+        const mapButton = document.createElement('a');
+        mapButton.href = '/static/camera_map.html';
+        mapButton.target = '_blank';
+        mapButton.className = 'sidebar-nav-item';
+        mapButton.id = 'knlCameraMapButton';
+        mapButton.style.textDecoration = 'none';
         mapButton.textContent = `Camera Map · ${registry.count}`;
-        mapButton.onclick = () => openMap();
         nav?.after(mapButton);
 
         const history = document.getElementById('trailModalHistoryBody');

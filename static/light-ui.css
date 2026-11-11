@@ -26,7 +26,8 @@ body.ui-light{background:#f4f7fb;color:#172033}
 .ui-light .knl-map-dialog{background:#fff!important;color:#172033!important}
 /* Keep headings, tabs and fixed legacy text readable on light surfaces. */
 .ui-light h1,.ui-light h2,.ui-light h3,.ui-light h4,.ui-light h5,.ui-light h6,.ui-light label,.ui-light summary,.ui-light .trail-subtab-btn,.ui-light .panel-title,.ui-light .section-title{color:#111827!important}
-.ui-light [style*="color: #fff"],.ui-light [style*="color:#fff"],.ui-light [style*="color: white"],.ui-light [style*="color:white"]{color:#111827!important}
+.ui-light a.knl-map-button,.ui-light .knl-map-button{color:#ffffff!important;background:#2563eb!important}
+.ui-light [style*="color: #fff"]:not(.knl-map-button),.ui-light [style*="color:#fff"]:not(.knl-map-button),.ui-light [style*="color: white"]:not(.knl-map-button),.ui-light [style*="color:white"]:not(.knl-map-button){color:#111827!important}
 .ui-light .trail-subtab-btn span,.ui-light .trail-subtab-btn.active,.ui-light .trail-subtab-btn.active span{color:#111827!important}
 .ui-light .btn-primary,.ui-light .btn-primary span,.ui-light button[type=submit],.ui-light button[type=submit] span,.ui-light .btn-login,.ui-light .tile-standby button,.ui-light .tile-standby button span,.ui-light .feed-main-tab.active,.ui-light .feed-main-tab.active span{color:#fff!important}
 /* Vehicle activity: readable light cards for both live feeds and uploaded media. */

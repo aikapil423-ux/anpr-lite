@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karnal Camera Locations - Full Screen Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body, html {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #f8fafc;
+            color: #0f172a;
+        }
+        header {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            z-index: 1000;
+            flex-wrap: wrap;
+        }
+        .header-title-box {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-subtitle {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-grow: 1;
+            max-width: 650px;
+            justify-content: flex-end;
+        }
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 200px;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: #f1f5f9;
+            transition: all 0.2s ease;
+        }
+        .search-box input:focus {
+            background: #ffffff;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+        .btn {
+            background: #2563eb;
+            color: #ffffff;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: background 0.2s ease;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            background: #1d4ed8;
+        }
+        .btn-outline {
+            background: #f8fafc;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+        .btn-outline:hover {
+            background: #e2e8f0;
+        }
+        #map-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        /* Custom side list panel toggleable */
+        #camera-sidebar {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            bottom: 15px;
+            width: 340px;
+            max-width: calc(100vw - 30px);
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(8px);
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #camera-sidebar.collapsed {
+            transform: translateX(calc(100% + 20px));
+        }
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar-header h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .sidebar-close-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #64748b;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .sidebar-close-btn:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        .sidebar-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 10px;
+        }
+        .site-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .site-card:hover {
+            border-color: #2563eb;
+            box-shadow: 0 2px 5px rgba(37,99,235,0.08);
+            transform: translateY(-1px);
+        }
+        .site-card.active {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+        .site-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+        .site-card-sub {
+            font-size: 11px;
+            color: #64748b;
+            display: flex;
+            justify-content: space-between;
+        }
+        .badge {
+            background: #e2e8f0;
+            color: #334155;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 10px;
+        }
+        .toggle-sidebar-floating {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            cursor: pointer;
+            display: none;
+        }
+        .toggle-sidebar-floating.visible {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        /* Custom map popup styles */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .knl-site-popup {
+            max-height: 240px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        .knl-site-popup strong {
+            font-size: 13px;
+            color: #1e293b;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .camera-badge-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .camera-badge-item {
+            font-size: 11px;
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #334155;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title-box">
+            <div class="header-title">
+                <span>📍 Karnal Camera Locations</span>
+                <span class="badge" id="camera-count-badge">Loading...</span>
+            </div>
+            <div class="header-subtitle" id="stats-subtitle">
+                Loading registry...
+            </div>
+        </div>
+        <div class="header-controls">
+            <div class="search-box">
+                <input type="text" id="camera-search" placeholder="Search location or camera ID..." autocomplete="off">
+            </div>
+            <button class="btn btn-outline" id="btn-fit-bounds" title="Fit all cameras in view">
+                Fit All
+            </button>
+            <button class="btn btn-outline" id="btn-toggle-fullscreen" title="Toggle Fullscreen">
+                ⛶ Fullscreen
+            </button>
+            <a href="/" class="btn">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </header>
+
+    <div id="map-container">
+        <div id="map"></div>
+        <button class="toggle-sidebar-floating" id="btn-show-sidebar">
+            📋 Show Locations (<span id="site-count-pill">0</span>)
+        </button>
+        <div id="camera-sidebar">
+            <div class="sidebar-header">
+                <h4>Locations (<span id="sidebar-count">0</span>)</h4>
+                <button class="sidebar-close-btn" id="btn-close-sidebar" title="Hide list">✕</button>
+            </div>
+            <div class="sidebar-list" id="sites-list">
+                <!-- Dynamically generated -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map = null;
+        let registry = null;
+        let markers = [];
+        let activeMarker = null;
+
+        async function init() {
+            // Leaflet map setup
+            map = L.map('map', {
+                zoomControl: true
+            }).setView([29.695, 76.985], 13);
+
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            try {
+                const response = await fetch('/api/cameras/registry');
+                if (!response.ok) throw new Error('Failed to load camera registry');
+                registry = await response.json();
+                renderData();
+            } catch (err) {
+                console.error(err);
+                alert('Camera locations load karne me samasya aayi: ' + err.message);
+            }
+        }
+
+        function renderData() {
+            if (!registry || !registry.sites) return;
+
+            document.getElementById('camera-count-badge').textContent = `${registry.count} Cameras`;
+            document.getElementById('stats-subtitle').textContent = `Karnal • ${registry.site_count} locations • ${registry.count} cameras (ICCC-KNL)`;
+            document.getElementById('site-count-pill').textContent = registry.site_count;
+            document.getElementById('sidebar-count').textContent = registry.site_count;
+
+            const bounds = [];
+            const listHost = document.getElementById('sites-list');
+            listHost.innerHTML = '';
+
+            registry.sites.forEach(site => {
+                bounds.push([site.lat, site.lng]);
+
+                // Create marker
+                const marker = L.circleMarker([site.lat, site.lng], {
+                    radius: 8,
+                    color: '#1d4ed8',
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.85,
+                    weight: 2
+                }).addTo(map);
+
+                marker.bindTooltip(`<strong>${site.name}</strong><br>${site.installed_cameras} cameras`, {
+                    direction: 'top',
+                    offset: [0, -6]
+                });
+
+                // Get cameras for this site
+                const siteCameras = registry.cameras.filter(c => c.site_id === site.id);
+                
+                const popupContent = `
+                    <div class="knl-site-popup">
+                        <strong>${site.name}</strong>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:8px;">${site.installed_cameras} cameras at this site</div>
+                        <div class="camera-badge-list">
+                            ${siteCameras.map(c => `
+                                <div class="camera-badge-item">
+                                    <span>${c.name}</span>
+                                    <code>${c.id}</code>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+
+                markers.push({
+                    site,
+                    marker,
+                    cameras: siteCameras
+                });
+
+                // Create sidebar card
+                const card = document.createElement('div');
+                card.className = 'site-card';
+                card.id = `card-${site.id}`;
+                card.innerHTML = `
+                    <div class="site-card-title">${site.name}</div>
+                    <div class="site-card-sub">
+                        <span>${site.installed_cameras} cameras</span>
+                        <span>ID: ${site.id}</span>
+                    </div>
+                `;
+                card.onclick = () => {
+                    focusSite(site, marker);
+                };
+                listHost.append(card);
+            });
+
+            if (bounds.length) {
+                map.fitBounds(bounds, { padding: [40, 40] });
+            }
+
+            setupInteractions();
+        }
+
+        function focusSite(site, marker) {
+            map.flyTo([site.lat, site.lng], 16, { duration: 0.8 });
+            marker.openPopup();
+            
+            document.querySelectorAll('.site-card').forEach(el => el.classList.remove('active'));
+            const card = document.getElementById(`card-${site.id}`);
+            if (card) {
+                card.classList.add('active');
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function setupInteractions() {
+            // Search filter
+            const searchInput = document.getElementById('camera-search');
+            searchInput.addEventListener('input', e => {
+                const term = e.target.value.toLowerCase().trim();
+                let firstMatch = null;
+
+                markers.forEach(item => {
+                    const matchSite = item.site.name.toLowerCase().includes(term);
+                    const matchCamera = item.cameras.some(c => 
+                        c.name.toLowerCase().includes(term) || c.id.toLowerCase().includes(term)
+                    );
+                    const matched = !term || matchSite || matchCamera;
+
+                    const card = document.getElementById(`card-${item.site.id}`);
+                    if (card) card.style.display = matched ? 'block' : 'none';
+
+                    if (matched) {
+                        item.marker.setStyle({ opacity: 1, fillOpacity: 0.85, radius: 8 });
+                        if (!firstMatch && term) firstMatch = item;
+                    } else {
+                        item.marker.setStyle({ opacity: 0.2, fillOpacity: 0.1, radius: 5 });
+                    }
+                });
+
+                if (firstMatch) {
+                    focusSite(firstMatch.site, firstMatch.marker);
+                }
+            });
+
+            // Fit all button
+            document.getElementById('btn-fit-bounds').onclick = () => {
+                if (registry && registry.sites && registry.sites.length) {
+                    map.fitBounds(registry.sites.map(s => [s.lat, s.lng]), { padding: [40, 40] });
+                }
+            };
+
+            // Fullscreen toggle
+            document.getElementById('btn-toggle-fullscreen').onclick = () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.error('Fullscreen error:', err);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            };
+
+            // Sidebar toggle
+            const sidebar = document.getElementById('camera-sidebar');
+            const showBtn = document.getElementById('btn-show-sidebar');
+            const closeBtn = document.getElementById('btn-close-sidebar');
+
+            closeBtn.onclick = () => {
+                sidebar.classList.add('collapsed');
+                showBtn.classList.add('visible');
+            };
+
+            showBtn.onclick = () => {
+                sidebar.classList.remove('collapsed');
+                showBtn.classList.remove('visible');
+            };
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
