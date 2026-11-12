@@ -7,7 +7,7 @@ let rows=[], busy=false, filter='matched', query='', selectedPlate=null, map=nul
 const matched = row => ['EXACT','SAME'].includes(row.status);
 const status = row => ({EXACT:'Exact match · Auto added',PENDING:'Near match · Review needed',SAME:'Same · Confirmed',NOT_SAME:'Not Same · Normal detection',NORMAL:'Normal detection'}[row.status]||row.status);
 const image = (url,label) => url ? `<img class="vtr-photo" src="${esc(url)}" alt="${esc(label)}" loading="lazy" role="button" tabindex="0" title="Click to enlarge image" aria-label="Enlarge ${esc(label)}">` : '<div class="vtr-no-photo">Photo unavailable</div>';
-// Delegate so polling can replace review cards without losing zoom actions.
+// Delegate so polling can replace review rows without losing zoom actions.
 function enlargeReviewPhoto(event){
  const photo=event.target.closest?.('img.vtr-photo');
  if(!photo)return;
@@ -17,6 +17,74 @@ function enlargeReviewPhoto(event){
 }
 document.addEventListener('click',enlargeReviewPhoto);
 document.addEventListener('keydown',enlargeReviewPhoto);
+function table(label, columns, body){
+ return `<div class="vtr-table-wrap"><table class="vtr-table" aria-label="${label}">
+  <thead><tr>${columns.map(column=>`<th scope="col">${column}</th>`).join('')}</tr></thead>
+  <tbody>${body}</tbody>
+ </table></div>`;
+}
+
+function comparePlateNumbers(detectedPlate, registeredPlate){
+ const detected=String(detectedPlate??'');
+ const registered=String(registeredPlate??'');
+ const distance=Array.from({length:detected.length+1},()=>Array(registered.length+1));
+ for(let i=detected.length;i>=0;i--){
+  for(let j=registered.length;j>=0;j--){
+   if(i===detected.length)distance[i][j]=registered.length-j;
+   else if(j===registered.length)distance[i][j]=detected.length-i;
+   else distance[i][j]=Math.min(
+    distance[i+1][j]+1,
+    distance[i][j+1]+1,
+    distance[i+1][j+1]+(detected[i]===registered[j]?0:1)
+   );
+  }
+ }
+ let detectedHtml='',registeredHtml='';
+ let i=0,j=0;
+ while(i<detected.length||j<registered.length){
+  if(i<detected.length&&j<registered.length&&detected[i]===registered[j]){
+   detectedHtml+=esc(detected[i++]);
+   registeredHtml+=esc(registered[j++]);
+  }else if(i<detected.length&&j<registered.length&&distance[i][j]===distance[i+1][j+1]+1){
+   detectedHtml+=`<mark class="vtr-plate-difference" title="Different character">${esc(detected[i++])}</mark>`;
+   registeredHtml+=esc(registered[j++]);
+  }else if(j<registered.length&&distance[i][j]===distance[i][j+1]+1){
+   registeredHtml+=`<mark class="vtr-plate-missing" title="Missing from detected number">${esc(registered[j++])}</mark>`;
+  }else{
+   detectedHtml+=`<mark class="vtr-plate-difference" title="Extra detected character">${esc(detected[i++])}</mark>`;
+  }
+ }
+ return {detectedHtml,registeredHtml};
+}
+
+function reviewRow(r){
+ const {detectedHtml,registeredHtml}=comparePlateNumbers(r.detected_plate,r.candidate_plate);
+ return `<tr class="vtr-review-row">
+  <th scope="row" class="vtr-number vtr-detected-number">${detectedHtml}</th>
+  <td class="vtr-number vtr-registered-number">${registeredHtml}</td>
+  <td><div class="vtr-evidence">${image(r.plate_photo,'Detected plate')}${image(r.vehicle_photo,'Detected vehicle')}${image(r.candidate_photo,'Registered vehicle')}</div></td>
+  <td>${Math.round(r.similarity*100)}% similarity<br>${esc(r.confidence)}% OCR</td>
+  <td>${esc(r.location||'Camera unavailable')}<br>${esc(r.captured_at)}${r.camera_id?'<br>'+esc(r.camera_id):''}</td>
+  <td><div class="vtr-actions">
+   <button type="button" class="btn btn-primary" data-decision="SAME" data-id="${esc(r.id)}">Same vehicle</button>
+   <button type="button" class="btn btn-secondary" data-decision="NOT_SAME" data-id="${esc(r.id)}">Different vehicle</button>
+  </div></td>
+ </tr>`;
+}
+
+function trailRow([plate,sightings]){
+ const newest=sightings[0];
+ const cameras=new Set(sightings.map(r=>r.camera_id).filter(Boolean));
+ const isMatched=sightings.some(matched);
+ return `<tr>
+  <th scope="row" class="vtr-number">${esc(plate)}</th>
+  <td><span class="vtr-badge ${isMatched?'vtr-matched':''}">${isMatched?'Watchlist vehicle':'Normal vehicle'}</span></td>
+  <td>${sightings.length}</td><td>${cameras.size}</td>
+  <td>${esc(newest.location||'Unknown location')}</td><td>${esc(status(newest))}</td>
+  <td><button type="button" class="btn btn-secondary" data-route="${esc(plate)}">View trail</button></td>
+ </tr>`;
+}
+
 function render(){
  const host=document.getElementById('vtrList');if(!host)return;
  const pending=rows.filter(r=>r.status==='PENDING');
@@ -29,9 +97,20 @@ function render(){
  let visible=rows.filter(r=>(filter==='all'||filter==='pending'&&r.status==='PENDING'||filter==='matched'&&matched(r)||filter==='normal'&&['NORMAL','NOT_SAME'].includes(r.status))&&`${r.detected_plate} ${r.route_plate} ${r.location||''}`.toLowerCase().includes(query));
  const reviews=visible.filter(r=>r.status==='PENDING');
  const groups=new Map();visible.filter(r=>r.status!=='PENDING').forEach(r=>{if(!groups.has(r.route_plate))groups.set(r.route_plate,[]);groups.get(r.route_plate).push(r);});
- const nextHtml=reviews.map(r=>`<article class="vtr-card vtr-pending"><div class="vtr-card-head"><strong>Check if these are the same vehicle</strong><span class="vtr-badge">Review needed</span></div><div class="vtr-compare"><div><span class="vtr-label">Detected number</span><strong class="vtr-number">${esc(r.detected_plate)}</strong>${image(r.plate_photo,'Detected plate')}${image(r.vehicle_photo,'Detected vehicle')}</div><div><span class="vtr-label">Registered number</span><strong class="vtr-number">${esc(r.candidate_plate)}</strong>${image(r.candidate_photo,'Registered vehicle')}<p>Similarity: ${Math.round(r.similarity*100)}% · OCR: ${esc(r.confidence)}%</p></div></div><p>${esc(r.location||'Camera unavailable')} · ${esc(r.captured_at)}${r.camera_id?' · '+esc(r.camera_id):''}</p><div class="vtr-actions"><button type="button" class="btn btn-primary" data-decision="SAME" data-id="${r.id}">Same vehicle</button><button type="button" class="btn btn-secondary" data-decision="NOT_SAME" data-id="${r.id}">Different vehicle</button></div></article>`).join('')+
- [...groups.entries()].map(([plate,sightings])=>{const newest=sightings[0],cameras=new Set(sightings.map(r=>r.camera_id).filter(Boolean));return `<article class="vtr-card"><div class="vtr-card-head"><strong class="vtr-number">${esc(plate)}</strong><span class="vtr-badge ${sightings.some(matched)?'vtr-matched':''}">${sightings.some(matched)?'Watchlist vehicle':'Normal vehicle'}</span></div><p>${sightings.length} sightings · ${cameras.size} registered cameras · Latest: ${esc(newest.location||'Unknown location')}</p><p>${esc(status(newest))}</p><button class="btn btn-secondary" data-route="${esc(plate)}">View trail</button></article>`;}).join('')||'<p class="vtr-empty">No sightings in this view. Camera detections will appear here automatically.</p>';
- if(nextHtml!==lastListSignature){host.innerHTML=nextHtml;lastListSignature=nextHtml;}
+ const reviewTable=reviews.length?table('Sightings needing review',['Detected number','Registered number','Evidence photos','Match confidence','Camera and time','Decision'],reviews.map(reviewRow).join('')):'';
+ const trailTable=groups.size?table('Vehicle trails',['Number plate','Vehicle type','Sightings','Registered cameras','Latest location','Status','Trail'],[...groups].map(trailRow).join('')):'';
+ const nextHtml=reviewTable+trailTable||'<p class="vtr-empty">No sightings in this view. Camera detections will appear here automatically.</p>';
+ if(nextHtml!==lastListSignature){
+  const route=document.getElementById('vtrRoute');
+  if(host.contains(route))host.after(route);
+  host.innerHTML=nextHtml;
+  lastListSignature=nextHtml;
+  if(selectedPlate){
+   const button=[...host.querySelectorAll('[data-route]')].find(button=>button.dataset.route===selectedPlate);
+   if(button)placeRouteBelow(button);
+   else closeRoute();
+  }
+ }
  document.querySelectorAll('[data-vtr-filter]').forEach(b=>b.classList.toggle('active',b.dataset.vtrFilter===filter));
  if(selectedPlate){const signature=JSON.stringify(rows.filter(r=>r.route_plate===selectedPlate));if(signature!==lastRouteSignature){lastRouteSignature=signature;renderRoute(selectedPlate);}}
 }
@@ -42,9 +121,9 @@ async function refresh(){
  finally{busy=false;}
 }
 async function decide(id,decision,button){
- const card=button.closest('.vtr-card');card.querySelectorAll('button').forEach(b=>b.disabled=true);
+ const row=button.closest('.vtr-review-row');row.querySelectorAll('button').forEach(b=>b.disabled=true);
  try{const res=await fetch(`/api/vehicle-trails/observations/${id}/decision`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision,detected_plate:rows.find(r=>r.id===id)?.detected_plate,candidate_plate:rows.find(r=>r.id===id)?.candidate_plate})});const data=await res.json();if(!res.ok)throw new Error(data.detail||'Review could not be saved');rows=rows.map(r=>r.id===id?data.observation:r);render();document.getElementById('vtrFeedback').textContent=decision==='SAME'?'Same confirmed. Added to the registered vehicle trail.':'Not Same saved. Kept as a normal detection with its own trail.';await refresh();}
- catch(e){document.getElementById('vtrError').textContent=e.message;card.querySelectorAll('button').forEach(b=>b.disabled=false);}
+ catch(e){document.getElementById('vtrError').textContent=e.message;row.querySelectorAll('button').forEach(b=>b.disabled=false);}
 }
 function addRouteArrows(linePts, count = 3) {
  if (!linePts || linePts.length < 2) return;
@@ -78,11 +157,51 @@ function addRouteArrows(linePts, count = 3) {
   }
  });
 }
+function placeRouteBelow(button){
+ const route=document.getElementById('vtrRoute');
+ const previousRow=route.closest('.vtr-route-row');
+ const vehicleRow=button.closest('tr');
+ if(vehicleRow.nextElementSibling===previousRow&&previousRow)return;
+ const detailRow=vehicleRow.parentElement.insertRow(vehicleRow.sectionRowIndex+1);
+ detailRow.className='vtr-route-row';
+ const cell=detailRow.insertCell();
+ cell.colSpan=vehicleRow.cells.length;
+ cell.append(route);
+ previousRow?.remove();
+ requestAnimationFrame(()=>{if(!route.hidden)map?.invalidateSize();});
+}
+
+function closeRoute(){
+ selectedPlate=null;
+ routeVersion++;
+ const route=document.getElementById('vtrRoute');
+ route.hidden=true;
+ const detailRow=route.closest('.vtr-route-row');
+ if(detailRow){
+  document.getElementById('vtrList').after(route);
+  detailRow.remove();
+ }
+}
+
 async function renderRoute(plate){
  const version=++routeVersion,section=document.getElementById('vtrRoute');section.hidden=false;
  const sightings=rows.filter(r=>r.route_plate===plate&&r.status!=='PENDING').sort((a,b)=>a.epoch-b.epoch||a.id-b.id);
  document.getElementById('vtrRouteTitle').textContent=`Vehicle trail · ${plate}`;
- document.getElementById('vtrTimeline').innerHTML=sightings.map((r,i)=>`<li><strong>${esc(r.location||'Location not registered')}</strong> · ${esc(r.captured_at)}<br><span>${esc(r.camera_id||'No registered camera')} · Detected: ${esc(r.detected_plate)} · ${esc(status(r))}</span><div class="vtr-sighting-photos"><div><span class="vtr-label">Detected plate</span>${image(r.plate_photo,'Sighting '+(i+1)+' — detected plate')}</div><div><span class="vtr-label">Detected vehicle</span>${image(r.vehicle_photo,'Sighting '+(i+1)+' — detected vehicle')}</div></div></li>`).join('');
+ const sightingRows=sightings.map((r,i)=>`<tr>
+  <td>${i+1}</td>
+  <th scope="row">${esc(r.location||'Location not registered')}</th>
+  <td>${esc(r.captured_at||'—')}</td>
+  <td>${esc(r.camera_id||'No registered camera')}</td>
+  <td class="vtr-number">${esc(r.detected_plate||'—')}</td>
+  <td>${esc(status(r))}</td>
+  <td>${image(r.plate_photo,'Sighting '+(i+1)+' — detected plate')}</td>
+  <td>${image(r.vehicle_photo,'Sighting '+(i+1)+' — detected vehicle')}</td>
+ </tr>`).join('');
+ document.getElementById('vtrTimeline').innerHTML=table(
+  'Vehicle trail sightings',
+  ['#','Location','Captured at','Camera ID','Detected number','Status','Plate photo','Vehicle photo'],
+  sightingRows
+ );
  const points=sightings.filter(r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng));
  const caption=document.getElementById('vtrRouteCaption');
  if(!window.L){caption.textContent='Map could not load. The chronological sightings remain available below.';return;}
@@ -117,19 +236,12 @@ async function renderRoute(plate){
 }
 function init(){
  const view=document.getElementById('subviewVehicleTrail');if(!view)return;
- const panel=document.createElement('section');panel.id='vehicleTrailReviewPanel';panel.innerHTML=`<div class="vtr-heading"><h3>Vehicle trails</h3><button type="button" class="btn btn-secondary" id="vtrRefresh">Refresh</button></div><p id="vtrSummary">Loading camera sightings…</p><div class="vtr-toolbar"><input type="search" id="vtrSearch" aria-label="Search vehicle trails" placeholder="Search number or camera…"><button class="filter-btn" data-vtr-filter="all">All trails</button><button class="filter-btn" data-vtr-filter="pending">Needs review <span id="vtrPendingCount">0</span></button><button class="filter-btn active" data-vtr-filter="matched">Watchlist matched</button></div><p id="vtrError" role="status"></p><p id="vtrFeedback" role="status"></p><section id="vtrRoute" hidden><div class="vtr-heading"><h4 id="vtrRouteTitle"></h4><button class="btn btn-secondary" data-close-route>Close map</button></div><p id="vtrRouteCaption"></p><div id="vtrMap"></div><ol id="vtrTimeline"></ol></section><div id="vtrList"></div>`;
- // Move Clear entries button next to the top Refresh button in the master-trail-tabs-bar
- const topRefresh=document.getElementById('btnRefreshMasterTrail');
- if(topRefresh&&!document.getElementById('vtrClear')){
-  const clearBtn=document.createElement('button');
-  clearBtn.type='button';clearBtn.className='btn btn-danger';clearBtn.id='vtrClear';
-  clearBtn.textContent='Clear entries';
-  clearBtn.style.marginRight='8px';
-  topRefresh.before(clearBtn);
- }
+ const panel=document.createElement('section');panel.id='vehicleTrailReviewPanel';panel.innerHTML=`<div class="vtr-heading"><h3>Vehicle trails</h3><div class="vtr-actions"><button type="button" class="btn btn-danger" id="vtrClear">Clear entries</button><button type="button" class="btn btn-secondary" id="vtrRefresh">Refresh</button></div></div><p id="vtrSummary">Loading camera sightings…</p><div class="vtr-toolbar"><input type="search" id="vtrSearch" aria-label="Search vehicle trails" placeholder="Search number or camera…"><button class="filter-btn" data-vtr-filter="all">All trails</button><button class="filter-btn" data-vtr-filter="pending">Needs review <span id="vtrPendingCount">0</span></button><button class="filter-btn active" data-vtr-filter="matched">Watchlist matched</button></div><p id="vtrError" role="status"></p><p id="vtrFeedback" role="status"></p><section id="vtrRoute" hidden><div class="vtr-heading"><h4 id="vtrRouteTitle"></h4><button class="btn btn-secondary" data-close-route>Close map</button></div><p id="vtrRouteCaption"></p><div id="vtrMap"></div><div id="vtrTimeline"></div></section><div id="vtrList"></div>`;
+ const topToolbar=view.closest('#viewMasterTrail')?.querySelector('.master-trail-tabs-bar');
+ if(topToolbar)topToolbar.style.display='none';
  // Keep the previous registered-vehicle history available below the new workflow.
  const legacy=document.createElement('details');legacy.className='vtr-legacy';legacy.innerHTML='<summary>Registered vehicle history & filters</summary>';while(view.firstChild)legacy.append(view.firstChild);view.append(panel,legacy);
- panel.addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;if(button.dataset.decision)decide(Number(button.dataset.id),button.dataset.decision,button);else if(button.dataset.route){selectedPlate=button.dataset.route;lastRouteSignature=JSON.stringify(rows.filter(r=>r.route_plate===selectedPlate));renderRoute(selectedPlate);document.getElementById('vtrRoute').scrollIntoView({behavior:'smooth',block:'start'});}else if(button.hasAttribute('data-close-route')){selectedPlate=null;routeVersion++;document.getElementById('vtrRoute').hidden=true;}else if(button.dataset.vtrFilter){filter=button.dataset.vtrFilter;render();}});
+ panel.addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;if(button.dataset.decision)decide(Number(button.dataset.id),button.dataset.decision,button);else if(button.dataset.route){selectedPlate=button.dataset.route;lastRouteSignature=JSON.stringify(rows.filter(r=>r.route_plate===selectedPlate));placeRouteBelow(button);renderRoute(selectedPlate);}else if(button.hasAttribute('data-close-route')){closeRoute();}else if(button.dataset.vtrFilter){filter=button.dataset.vtrFilter;render();}});
  document.getElementById('vtrSearch').addEventListener('input',e=>{query=e.target.value.trim().toLowerCase();render();});
  document.getElementById('vtrRefresh').addEventListener('click',refresh);
  document.getElementById('vtrClear').addEventListener('click',async e=>{
@@ -141,7 +253,7 @@ function init(){
    const res=await fetch('/api/vehicle-trails/observations',{method:'DELETE'});
    if(!res.ok)throw new Error(res.status===405||res.status===404?'Clear entries is not active on the server. Restart the backend and refresh this page.':res.status===401?'Please sign in again to clear entries.':'Could not clear trail entries. Please retry.');
    const data=await res.json();rows=[];selectedPlate=null;routeVersion++;lastRouteSignature='';
-   document.getElementById('vtrRoute').hidden=true;render();
+   closeRoute();render();
    document.getElementById('vtrFeedback').textContent=`${data.deleted_count} entries cleared.`;
    document.getElementById('vtrError').textContent='';
   }catch(error){document.getElementById('vtrError').textContent=error.message;}
@@ -153,7 +265,7 @@ function init(){
   document.getElementById(id)?.addEventListener('click',()=>{
    filter='matched';query='';selectedPlate=null;routeVersion++;lastRouteSignature='';
    document.getElementById('vtrSearch').value='';
-   document.getElementById('vtrRoute').hidden=true;
+   closeRoute();
    render();refresh();
   },true);
  }

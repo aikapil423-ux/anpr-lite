@@ -126,3 +126,74 @@ body.ui-light button:disabled span{color:#64748b!important}
 body.ui-light input::placeholder,body.ui-light textarea::placeholder{color:#52647c!important;opacity:1}
 body.ui-light a:not(.btn){color:#1d4ed8}
 body.ui-light a:not(.btn):hover{color:#1e40af}
+
+#singleCamViewport.is-standby .cam-osd-top,
+#singleCamViewport.is-standby .cam-osd-bottom {
+  display: none;
+}
+#screenCenterMsg {
+  box-sizing: border-box;
+  width: min(100%, 420px);
+  padding: 12px 16px;
+}
+#screenCenterMsg .cctv-lens-graphic {
+  width: 48px;
+  height: 48px;
+}
+#screenCenterMsg .cctv-lens-graphic svg {
+  width: 30px;
+  height: 30px;
+}
+.session-actions {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 14px #0f172a26;
+  overflow: auto;
+}
+.session-actions button {
+  display: block;
+  margin-top: 5px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.session-route-panel { padding: 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; }
+.session-route-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.session-route-header h3 { margin: 0; margin-right: auto; }
+.session-route-header select { max-width: 100%; }
+.session-route-panel > p { margin: 8px 0; }
+.session-route-map { height: clamp(240px, 35vh, 360px); border-radius: 6px; margin-bottom: 10px; }
+.session-route-sightings { overflow-x: auto; }
+
+#gridCamViewport.is-pair-view .cam-grid-container {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+#gridCamViewport.is-pair-view .is-hidden-in-pair,
+#btnStreamFullscreen[hidden] {
+  display: none !important;
+}
+.cam-tile:fullscreen {
+  width: 100%;
+  height: 100%;
+}
+
+.btn-tile-fullscreen,
+#gridCamViewport.is-pair-view .btn-tile-focus {
+  display: none;
+}
+#gridCamViewport.is-pair-view .cam-tile-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#gridCamViewport.is-pair-view .btn-tile-fullscreen {
+  display: inline-flex;
+  flex: 0 0 auto;
+}

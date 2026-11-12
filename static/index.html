@@ -68,7 +68,7 @@
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
 <link href="/static/simple-ui.css?v=2" rel="stylesheet"/>
-<link href="/static/light-ui.css?v=9" rel="stylesheet"/><link rel="stylesheet" href="/static/vehicle-trail-review.css?v=trail-photos-3">
+<link href="/static/light-ui.css?v=14" rel="stylesheet"/><link rel="stylesheet" href="/static/vehicle-trail-review.css?v=sightings-table-1">
 </head>
 <body class="ui-light">
 <header class="app-header">
@@ -729,9 +729,9 @@
 <span class="live-rec-dot" id="liveRecDot"></span>
 <span id="livePanelTitleText">SURVEILLANCE FEED</span>
 </div>
-<!-- Mode Switcher: 1x1 Focus vs 2x2 Grid -->
+<!-- Mode Switcher: 1x2 Pair vs 2x2 Grid -->
 <div class="view-mode-switcher">
-<button class="view-mode-btn" id="btnView1x1" title="1x1 Single Focus View" type="button">
+<button class="view-mode-btn" id="btnView1x1" title="1x2 Two Camera View" type="button">
 <svg fill="none" height="12" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="12"><rect height="18" rx="2" width="18" x="3" y="3"></rect></svg>
 
 
@@ -748,7 +748,7 @@
 
 
 
-                                    1x1 Focus
+                                    1x2 View
 
 
 
@@ -1041,7 +1041,7 @@
 </div>
 </div>
 <!-- 1x1 Single Focus Viewport -->
-<div class="single-cam-viewport" id="singleCamViewport" style="display: none; width: 100%; flex: 1; min-height: 0; position: relative; justify-content: center; align-items: center;">
+<div class="single-cam-viewport is-standby" id="singleCamViewport" style="display: none; width: 100%; flex: 1; min-height: 0; position: relative; justify-content: center; align-items: center;">
 <div class="reticle top-left"></div>
 <div class="reticle top-right"></div>
 <div class="reticle bottom-left"></div>
@@ -1071,9 +1071,8 @@
 <path d="M23 7l-7 5 7 5V7z"></path><rect height="14" rx="2" ry="2" width="15" x="1" y="5"></rect>
 </svg>
 </div>
-<h4>Live Stream Viewport Ready</h4>
-<p>Connect a live webcam, RTSP stream, or HTTP link above.<br/>Direct camera feed ingestion will stream here.</p>
-<span class="status-indicator-tag">● Signal Standby</span>
+<h4>Camera on standby</h4>
+<button class="btn-tile-quick-connect" id="btnConnectFocusedCamera" type="button">+ Connect</button>
 </div>
 </div>
 <!-- 2x2 Grid Viewport -->
@@ -1121,6 +1120,7 @@
 </div>
 <div class="tile-stats">
 <span id="tileFps-CAM-01">0.0 FPS</span>
+<button class="cam-ctrl-btn btn-tile-fullscreen" type="button" title="Fullscreen CAM-01" aria-label="Fullscreen CAM-01"><svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></button>
 </div>
 </div>
 </div>
@@ -1166,6 +1166,7 @@
 </div>
 <div class="tile-stats">
 <span id="tileFps-CAM-02">0.0 FPS</span>
+<button class="cam-ctrl-btn btn-tile-fullscreen" type="button" title="Fullscreen CAM-02" aria-label="Fullscreen CAM-02"><svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></button>
 </div>
 </div>
 </div>
@@ -5333,9 +5334,9 @@
 </div>
 <!-- Leaflet JS Engine for Police Route Mapping -->
 <script src="/static/vendor/leaflet/leaflet.js"></script>
-<script>window.KARNAL_CAMERA_MODE = true;</script><script src="/static/app.js?v=plate-consensus-1"></script><script src="/static/camera-registry.js?v=anpr-colours-1"></script>
+<script>window.KARNAL_CAMERA_MODE = true;</script><script src="/static/app.js?v=camera-pair-fullscreen-2"></script><script src="/static/camera-registry.js?v=sidebar-order-1"></script>
 <script src="/static/simple-ui.js?v=3"></script>
-<script src="/static/vehicle-trail-review.js?v=image-gallery-9"></script>
+<script src="/static/vehicle-trail-review.js?v=trail-toolbar-1"></script>
 <script>
 
 

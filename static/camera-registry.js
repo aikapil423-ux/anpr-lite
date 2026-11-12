@@ -229,7 +229,7 @@ window.KARNAL_CAMERA_MODE = true;
         window.openLocationPickerModal = fileId => openMap(fileId);
         window.closeLocationPickerModal = () => dialog.close();
 
-        const nav = document.getElementById('navMasterTrailBtn');
+        const nav = document.getElementById('navOpenVehiclesDrawerBtn');
         const mapButton = document.createElement('a');
         mapButton.href = '/static/camera_map.html';
         mapButton.className = 'sidebar-nav-item';

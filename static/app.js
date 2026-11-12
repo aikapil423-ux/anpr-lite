@@ -4540,7 +4540,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-                                <div class="pipe-stage-col-head">
+                                <button type="button" class="pipe-stage-col-head" aria-expanded="false" aria-controls="captureOcrVotingTable"
+                                    style="width: 100%; border: 0; background: transparent; padding: 0; cursor: pointer;"
+                                    onclick="const panel = document.getElementById('captureOcrVotingTable'); panel.hidden = !panel.hidden; this.setAttribute('aria-expanded', String(!panel.hidden)); if (!panel.hidden) panel.scrollIntoView({block: 'nearest'});">
 
 
 
@@ -4552,7 +4554,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-                                        OCR VOTING
+                                        OCR VOTING ▾
 
 
 
@@ -4564,19 +4566,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-                                </div>
+                                </button>
 
 
 
-                                <div class="pipe-stage-col-imgbox" style="flex-direction: column; gap: 2px; padding: 4px; font-family: var(--font-mono); font-size: 0.875rem;">
+                                <div class="pipe-stage-col-imgbox" style="height: auto; min-height: 112px; flex-direction: column; justify-content: flex-start; gap: 6px; padding: 4px; font-family: var(--font-mono); font-size: 0.875rem;">
 
 
 
-                                    ${evFrames && evFrames.length > 0 ? evFrames.slice(0, 3).map(ef => `
+                                    ${evFrames && evFrames.length > 0 ? evFrames.map(ef => `
 
 
 
-                                        <div style="width: 100%; display: flex; justify-content: space-between; background: rgba(241,245,249,0.6); padding: 2px 4px; border-radius: 3px;">
+                                        <div style="width: 100%; background: rgba(241,245,249,0.6); padding: 4px; border-radius: 3px;">
+                                            <div style="display: flex; justify-content: space-between; gap: 4px;">
 
 
 
@@ -4589,6 +4592,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
                                             <span style="color: #047857;">${ef.confidence}%</span>
+                                            </div>
 
 
 
@@ -4811,6 +4815,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
 
+
+                    <section id="captureOcrVotingTable" hidden style="margin-top: 12px; overflow-x: auto;">
+                        <h3 style="margin: 0 0 8px;">OCR Voting Evidence</h3>
+                        <table class="vtr-table" aria-label="OCR Voting Evidence">
+                            <thead><tr>
+                                <th scope="col">Frame</th>
+                                <th scope="col">Detected number</th>
+                                <th scope="col">Confidence</th>
+                                <th scope="col">Plate photo</th>
+                            </tr></thead>
+                            <tbody>
+                                ${(evFrames.length ? evFrames : [{text: c.display_plate || c.plate_number, confidence: ocrConf}]).map(ef => {
+                                  const photo = ef.crop_base64 ? window.formatEvidenceImageSrc(ef.crop_base64) : evFrames.length ? '' : plateCropSrc;
+                                  const frame = ef.frame_idx == null ? 'Direct read' : 'F#' + ef.frame_idx;
+                                  return `<tr>
+                                    <th scope="row">${escapeHtml(frame)}</th>
+                                    <td>${escapeHtml(ef.text || c.plate_number || 'Unknown')}</td>
+                                    <td>${ef.confidence == null ? '—' : escapeHtml(ef.confidence) + '%'}</td>
+                                    <td>${photo ? `<img src="${escapeHtml(photo)}" alt="Plate crop for ${escapeHtml(frame)}" loading="lazy" style="max-width: 100%; max-height: 72px; object-fit: contain; cursor: zoom-in;">` : 'Plate crop unavailable'}</td>
+                                  </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </section>
 
                     <!-- Action Footer -->
 
@@ -8558,7 +8586,7 @@ document.addEventListener('DOMContentLoaded', () => {
     "CAM-03": "West Lane",
     "CAM-04": "East Terminal"
   };
-  let currentViewMode = localStorage.getItem('anpr_cam_view_mode') || 'grid';
+  let currentViewMode = localStorage.getItem('anpr_cam_view_mode') === 'grid' ? 'grid' : 'pair';
   let focusedCameraId = "CAM-01";
   let streamStatusPoll = null;
   let cameraActiveStates = {};
@@ -8572,9 +8600,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dlBtn) dlBtn.style.display = 'none';
     const titleText = document.getElementById('livePanelTitleText');
     if (titleText) titleText.innerText = "SURVEILLANCE FEED";
-    if (mode === 'grid') {
-      if (btnView2x2) btnView2x2.classList.add('active');
-      if (btnView1x1) btnView1x1.classList.remove('active');
+    const isPair = mode === 'pair';
+    gridCamViewport?.classList.toggle('is-pair-view', isPair);
+    if (btnStreamFullscreen) btnStreamFullscreen.hidden = isPair;
+    CAMERA_SLOTS.forEach((cid, index) => {
+      const tile = document.getElementById(`tile-${cid}`);
+      if (!tile) return;
+      tile.classList.toggle('is-hidden-in-pair', isPair && index >= 2);
+      const fullscreen = tile.querySelector('.btn-tile-focus');
+      if (fullscreen) {
+        fullscreen.title = isPair ? `Fullscreen ${cid}` : `Focus ${cid}`;
+        fullscreen.setAttribute('aria-label', fullscreen.title);
+      }
+    });
+    if (mode !== 'focus') {
+      if (btnView2x2) btnView2x2.classList.toggle('active', !isPair);
+      if (btnView1x1) btnView1x1.classList.toggle('active', isPair);
       if (gridCamViewport) gridCamViewport.style.display = 'block';
       if (singleCamViewport) singleCamViewport.style.display = 'none';
       if (camStatusBadge) camStatusBadge.style.display = 'none';
@@ -8606,7 +8647,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   if (btnView1x1) {
-    btnView1x1.addEventListener('click', () => switchViewMode('focus'));
+    btnView1x1.addEventListener('click', () => switchViewMode('pair'));
   }
   if (btnView2x2) {
     btnView2x2.addEventListener('click', () => switchViewMode('grid'));
@@ -8738,6 +8779,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (customVideoSelectedBadge) customVideoSelectedBadge.style.display = 'none';
     });
   }
+  document.getElementById('btnConnectFocusedCamera')?.addEventListener('click', () => {
+    openConnectModalForCamera(focusedCameraId);
+  });
+
   function openConnectModalForCamera(camId) {
     const cid = camId || focusedCameraId || "CAM-01";
     if (feedCameraSlot) feedCameraSlot.value = cid;
@@ -8938,14 +8983,25 @@ document.addEventListener('DOMContentLoaded', () => {
   CAMERA_SLOTS.forEach(cid => {
     const tile = document.getElementById(`tile-${cid}`);
     if (!tile) return;
-    tile.addEventListener('dblclick', () => {
+    tile.addEventListener('dblclick', event => {
+      if (currentViewMode === 'pair' || event.target.closest('button')) return;
       focusedCameraId = cid;
       switchViewMode('focus');
     });
     const btnFocus = tile.querySelector('.btn-tile-focus');
+    tile.querySelector('.btn-tile-fullscreen')?.addEventListener('click', () => btnFocus?.click());
     if (btnFocus) {
-      btnFocus.addEventListener('click', e => {
+      btnFocus.addEventListener('click', async e => {
         e.stopPropagation();
+        if (currentViewMode === 'pair') {
+          try {
+            if (document.fullscreenElement === tile) await document.exitFullscreen();
+            else await tile.requestFullscreen();
+          } catch (error) {
+            console.warn('Could not toggle camera fullscreen:', error);
+          }
+          return;
+        }
         focusedCameraId = cid;
         switchViewMode('focus');
       });
@@ -9039,6 +9095,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         liveFeedImg.style.display = 'block';
         screenCenterMsg.style.display = 'none';
+        singleCamViewport.classList.remove('is-standby');
         btnOpenConnectModal.style.display = 'none';
         btnDisconnectStream.style.display = 'inline-flex';
         const btnTogglePauseStream = document.getElementById('btnTogglePauseStream');
@@ -9084,6 +9141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         liveFeedImg.src = '';
         liveFeedImg.style.display = 'none';
         screenCenterMsg.style.display = 'flex';
+        singleCamViewport.classList.add('is-standby');
         btnOpenConnectModal.style.display = 'none';
         btnDisconnectStream.style.display = 'none';
         const btnTogglePauseStream = document.getElementById('btnTogglePauseStream');
@@ -9237,7 +9295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             anprLbl.style.color = cam.anpr_enabled ? "#10b981" : "#52647c";
           }
           if (feedImg && standby) {
-            if (currentViewMode === 'grid') {
+            if (currentViewMode === 'grid' || (currentViewMode === 'pair' && CAMERA_SLOTS.indexOf(cid) < 2)) {
               if (!streamStartTimes[cid]) streamStartTimes[cid] = Date.now();
               if (!feedImg.src || feedImg.style.display === 'none' || feedImg.src === window.location.href || !feedImg.src.includes(cid)) {
                 feedImg.src = `/api/camera/stream/${cid}?t=${streamStartTimes[cid]}`;
@@ -10379,7 +10437,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (el && el.getAttribute('data-card-sig') === sig) {
         if (updateCardFn) updateCardFn(el, item, pos);
       } else {
-        const temp = document.createElement('div');
+        const temp = document.createElement(container.localName === 'tbody' ? 'tbody' : 'div');
         temp.innerHTML = buildHtml(item, pos, key, sig).trim();
         const newEl = temp.firstElementChild;
         if (el && el.parentNode) {
@@ -10401,7 +10459,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  function buildFreshVehicleCardHtml(v, pos, key, sig) {
+  function buildFreshVehicleRowHtml(v, pos, key, sig) {
     const isHit = v.is_hotlist_hit;
     const plate = escapeHtml(v.display_plate || v.plate_number || 'UNREADABLE');
     const conf = v.confidence || 0;
@@ -10412,36 +10470,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const altFallback = platePic && vehPic && platePic !== vehPic ? vehPic : '';
     const vIdBadge = `#${pos}`;
     const isTrafficViol = Boolean(v.is_traffic_violation || v.violation_type);
-    const cardRowClass = isHit ? 'is-hotlist' : isTrafficViol ? 'is-traffic-violation' : '';
     const cardClickAction = isTrafficViol ? 'window.openSplitViolationModal(' + v.id + ')' : 'openCaptureDetailModal(' + v.id + ')';
-    return `
-            <div class="fresh-card-row ${cardRowClass}" data-card-key="${key}" data-card-sig="${sig}" onclick="${cardClickAction}" title="${isTrafficViol ? '⚠️ Traffic Violation Detected - Click for Side-by-Side Inspector' : 'Click to inspect vehicle evidence'}">
-                <span class="cap-rank-badge ${pos === 1 ? 'newest' : ''}" style="${pos === 1 ? 'background: #f59e0b; color: #000; font-weight: 800;' : 'background: rgba(245, 158, 11, 0.2); color: #92400e;'}">${vIdBadge}</span>
-                <div class="fresh-card-thumb" style="border-color: ${isHit ? '#ef4444' : 'var(--border-color)'};">
-                    ${thumb ? `<img src="${thumb}" alt="Plate" style="object-fit: contain;" onerror="this.onerror=null; ${altFallback ? `this.src='${altFallback}'; this.onerror=function(){ this.parentElement.innerHTML='<span style=\'font-size:0.875rem; color:var(--text-muted);\'>No Crop</span>'; };` : `this.parentElement.innerHTML='<span style=\'font-size:0.875rem; color:var(--text-muted);\'>No Crop</span>';`}">` : '<span style="font-size:0.875rem; color:var(--text-muted);">No Crop</span>'}
-                </div>
-                <div class="fresh-card-body">
-                    <div class="fresh-card-primary">
-                        <span class="fresh-card-title">${plate}</span>
-                        <span class="conf-pill" style="font-size: 0.875rem; padding: 2px 6px;">${conf}%</span>
-                    </div>
-                    <div class="fresh-card-meta">
-                        <span style="color: #92400e; font-weight: 700;">VEHICLE</span>
-                        ${v.driver_name && v.driver_name.toUpperCase() !== 'UNKNOWN' ? `
-                            <span class="badge" style="background: ${['SUSPECT', 'WANTED', 'CRIMINAL'].includes((v.driver_category || '').toUpperCase()) ? 'rgba(239, 68, 68, 0.25)' : 'rgba(99, 102, 241, 0.25)'}; color: ${['SUSPECT', 'WANTED', 'CRIMINAL'].includes((v.driver_category || '').toUpperCase()) ? '#b91c1c' : '#4338ca'}; border: 1px solid ${['SUSPECT', 'WANTED', 'CRIMINAL'].includes((v.driver_category || '').toUpperCase()) ? 'rgba(239, 68, 68, 0.5)' : 'rgba(99, 102, 241, 0.4)'}; font-size: 0.875rem; padding: 1px 5px; border-radius: 4px;" title="Cross-Modal Linked Driver">
-                                👤 ${escapeHtml(v.driver_name)} ${v.driver_similarity ? `(${Math.round(v.driver_similarity)}%)` : ''}
-                            </span>
-                        ` : ''}
-                        <span>&bull;</span>
-                        <span>${escapeHtml(v.location || 'CAM-01')}</span>
-                        <span>&bull;</span>
-                        <span>${timeStr}</span>
-                        ${plate.includes('UNREADABLE') ? '<span style="color:#92400e; font-size:0.875rem; font-weight:600;">&bull; Plate not read</span>' : ''}
-                        ${isHit ? '<span style="color:#ef4444; font-weight:bold;">&bull; CASE ALERT</span>' : ''}
-                    </div>
-                </div>
-            </div>
-        `;
+    const driver = v.driver_name && v.driver_name.toUpperCase() !== 'UNKNOWN'
+      ? escapeHtml(v.driver_name) + (v.driver_similarity ? ` (${Math.round(v.driver_similarity)}%)` : '')
+      : '&mdash;';
+    return `<tr data-card-key="${escapeHtml(key)}" data-card-sig="${escapeHtml(sig)}" onclick="${cardClickAction}" style="cursor:pointer;${isHit ? 'background:#fff1f2;' : isTrafficViol ? 'background:#fffbeb;' : ''}">
+      <td><span class="cap-rank-badge ${pos === 1 ? 'newest' : ''}">${vIdBadge}</span></td>
+      <td><div class="fresh-card-thumb">${thumb ? `<img src="${escapeHtml(thumb)}" data-fallback="${escapeHtml(altFallback)}" alt="Vehicle capture" style="object-fit:contain;" onerror="if(this.dataset.fallback){const fallback=this.dataset.fallback;this.dataset.fallback='';this.src=fallback;}else{this.replaceWith('No Crop');}">` : 'No Crop'}</div></td>
+      <th scope="row" class="vtr-number">${plate}</th>
+      <td>${escapeHtml(v.location || 'CAM-01')}</td>
+      <td>${escapeHtml(timeStr)}</td>
+      <td>${driver}</td>
+      <td>${isHit ? '<span class="cap-hotlist-tag">CASE ALERT</span>' : isTrafficViol ? escapeHtml(v.violation_type || 'Traffic violation') : '&mdash;'}</td>
+      <td><span class="conf-pill">${escapeHtml(conf)}%</span></td>
+      <td><button type="button" class="cap-inspect-btn" onclick="event.stopPropagation(); ${cardClickAction}">Inspect</button></td>
+    </tr>`;
   }
   function renderFreshVehicles(vehicles, mode = 'live') {
     vehicles = (vehicles || []).filter(window.isVisibleVehicleDetection).slice(0, 15);
@@ -10474,12 +10517,27 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return;
     }
-    const newSig = vehicles.map(v => `${v.id}_${v.captured_at}_${v.confidence}_${v.display_plate || v.plate_number}_${v.is_traffic_violation}_${v.is_hotlist_hit}_${v.driver_name || ''}`).join('|');
+    const freshVehicleSignature = v => JSON.stringify([
+      v.id, v.captured_at, v.confidence, v.display_plate || v.plate_number, v.location,
+      v.plate_pic_path, v.vehicle_pic_path, v.is_traffic_violation, v.violation_type, v.is_hotlist_hit,
+      v.driver_name, v.driver_category, v.driver_similarity
+    ]);
+    const newSig = JSON.stringify(vehicles.map(freshVehicleSignature));
     if (container.dataset.lastSig === newSig) {
       return;
     }
     container.dataset.lastSig = newSig;
-    updateKeyedCardList(container, vehicles, v => v.id, v => `${v.id}_${v.confidence}_${v.display_plate || v.plate_number}_${v.is_traffic_violation}_${v.is_hotlist_hit}_${v.driver_name || ''}`, buildFreshVehicleCardHtml, (el, v, pos) => {
+    if (!container.querySelector('tbody')) {
+      container.innerHTML = `<div class="vtr-table-wrap"><table class="vtr-table" aria-label="${mode === 'upload' ? 'Uploaded Vehicles' : 'Live Stream Vehicles'}">
+        <thead><tr>
+          <th scope="col">#</th><th scope="col">Photo</th><th scope="col">Number plate</th>
+          <th scope="col">Location</th><th scope="col">Time</th><th scope="col">Driver</th>
+          <th scope="col">Alert</th><th scope="col">Confidence</th><th scope="col">Actions</th>
+        </tr></thead><tbody></tbody>
+      </table></div>`;
+    }
+    updateKeyedCardList(container.querySelector('tbody'), vehicles, v => v.id, freshVehicleSignature,
+      buildFreshVehicleRowHtml, (el, v, pos) => {
       const rankBadge = el.querySelector('.cap-rank-badge');
       if (rankBadge) {
         const badgeText = `#${pos}`;
@@ -12205,123 +12263,43 @@ document.addEventListener('DOMContentLoaded', () => {
       const drawerVehSig = items.map(v => `${v.id}_${v.captured_at}_${v.confidence}_${v.display_plate || v.plate_number}_${v.is_traffic_violation}_${v.is_hotlist_hit}`).join('|');
       if (container.dataset.lastSig === drawerVehSig) return;
       container.dataset.lastSig = drawerVehSig;
-      container.innerHTML = items.map((v, idx) => {
+      const captureRows = items.map((v, idx) => {
         const pos = idx + 1;
-        const isHit = v.is_hotlist_hit;
         const plate = escapeHtml(v.display_plate || v.plate_number || 'UNREADABLE');
-        const conf = v.confidence || 0;
-        const dateStr = v.captured_at || 'N/A';
-        const thumb = v.plate_pic_path || v.vehicle_pic_path || '';
-        const isTrafficViol = Boolean(v.is_traffic_violation || v.violation_type);
-        const rowClass = isHit ? 'is-hotlist' : isTrafficViol ? 'is-traffic-violation' : '';
-        const rowClickAction = isTrafficViol ? 'window.openSplitViolationModal(' + v.id + ')' : 'openCaptureDetailModal(' + v.id + ')';
-        return `
-                    <div class="captured-list-row ${rowClass}" onclick="${rowClickAction}" style="margin-bottom: 8px;">
-
-
-
-                        <div class="captured-list-left">
-
-
-
-                            <span class="cap-rank-badge ${pos === 1 ? 'newest' : ''}" style="${pos === 1 ? 'background: #f59e0b; color: #000;' : ''}">#${pos}</span>
-
-
-
-                            <div class="cap-row-thumb" style="width: 52px; height: 52px; border-radius: 6px; overflow: hidden; border: 1.5px solid ${isHit ? '#ef4444' : 'var(--border-color)'};">
-
-
-
-                                ${thumb ? `<img src="${thumb}" alt="Plate" style="width: 100%; height: 100%; object-fit: contain;">` : '<span style="font-size:0.875rem; color:var(--text-muted); display:flex; align-items:center; justify-content:center; height:100%;">No Crop</span>'}
-
-
-
-                            </div>
-
-
-
-                            <div style="margin-left: 6px;">
-
-
-
-                                <div style="color: #ffffff; font-weight: 700; font-family: var(--font-mono); font-size: 1.0125rem;">${plate}</div>
-
-
-
-                                ${window.isOcrConsensusReview(v) ? '<span class="badge-warning">Needs review</span>' : '<span class="badge-verified" style="font-size: 0.875rem; margin-top: 2px;">Verified</span>'}
-
-
-
-                            </div>
-
-
-
-                        </div>
-
-
-
-                        <div class="captured-list-mid">
-
-
-
-                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-
-
-
-                                ${isHit ? '<span class="cap-hotlist-tag" style="font-size: 0.875rem; padding: 2px 6px;">CASE HIT</span>' : isTrafficViol ? `<span class="badge-amber-violation" style="font-size: 0.875rem; padding: 2px 6px;">⚠️ ${escapeHtml(v.violation_type || 'TRAFFIC VIOLATION')} (₹${v.violation_fine || 1000})</span>` : ''}
-
-
-
-                                <span style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary);">${escapeHtml(v.location || 'CAM-01')}</span>
-
-
-
-                            </div>
-
-
-
-                            <div class="cap-mid-meta">
-
-
-
-                                <span>${dateStr}</span>
-
-
-
-                            </div>
-
-
-
-                        </div>
-
-
-
-                        <div class="captured-list-right">
-
-
-
-                            <span class="conf-pill" style="font-size: 0.875rem;">${conf}%</span>
-
-
-
-                            <button class="cap-inspect-btn" onclick="event.stopPropagation(); openCaptureDetailModal(${v.id})">Inspect</button>
-
-
-
-                            <button class="btn-danger" style="padding: 4px 8px; font-size: 0.875rem;" onclick="event.stopPropagation(); deleteCaptureRecord(${v.id}, '${plate}')">&times;</button>
-
-
-
-                        </div>
-
-
-
-                    </div>
-
-
-
-                `;
+        const thumb = v.plate_pic_path || v.vehicle_pic_path;
+        const isTrafficViolation = Boolean(v.is_traffic_violation || v.violation_type);
+        const inspect = isTrafficViolation ? `window.openSplitViolationModal(${Number(v.id)})` : `openCaptureDetailModal(${Number(v.id)})`;
+        const status = window.isOcrConsensusReview(v)
+          ? '<span class="badge-warning">Needs review</span>'
+          : '<span class="badge-verified">Verified</span>';
+        const alert = v.is_hotlist_hit
+          ? '<span class="cap-hotlist-tag">CASE HIT</span>'
+          : isTrafficViolation ? `<span class="badge-amber-violation">${escapeHtml(v.violation_type || 'TRAFFIC VIOLATION')} (&#8377;${escapeHtml(v.violation_fine || 1000)})</span>` : '&mdash;';
+        return `<tr onclick="${inspect}" style="cursor:pointer;${v.is_hotlist_hit ? 'background:#fff1f2;' : ''}">
+          <td><span class="cap-rank-badge ${pos === 1 ? 'newest' : ''}">#${pos}</span></td>
+          <td>${thumb ? `<img src="${escapeHtml(thumb)}" alt="Capture crop" loading="lazy" style="display:block;width:52px;height:52px;object-fit:contain;border-radius:6px;background:#111827;">` : '&mdash;'}</td>
+          <th scope="row" class="vtr-number">${plate}</th>
+          <td>${status}</td>
+          <td>${escapeHtml(v.location || 'CAM-01')}</td>
+          <td style="white-space:nowrap;">${escapeHtml(v.captured_at || 'N/A')}</td>
+          <td>${alert}</td>
+          <td><span class="conf-pill">${escapeHtml(v.confidence ?? 0)}%</span></td>
+          <td><div style="display:flex;align-items:center;gap:8px;">
+            <button type="button" class="cap-inspect-btn" onclick="event.stopPropagation(); ${inspect}">Inspect</button>
+            <button type="button" class="btn-danger" style="padding:4px 8px;" aria-label="Delete capture ${plate}" data-plate="${plate}" onclick="event.stopPropagation(); deleteCaptureRecord(${Number(v.id)}, this.dataset.plate)">&times;</button>
+          </div></td>
+        </tr>`;
       }).join('');
+      container.innerHTML = `<div class="vtr-table-wrap">
+        <table class="vtr-table" aria-label="Captured Vehicles Database">
+          <thead><tr>
+            <th scope="col">#</th><th scope="col">Photo</th><th scope="col">Number plate</th>
+            <th scope="col">Status</th><th scope="col">Location</th><th scope="col">Captured at</th>
+            <th scope="col">Alert</th><th scope="col">Confidence</th><th scope="col">Actions</th>
+          </tr></thead>
+          <tbody>${captureRows}</tbody>
+        </table>
+      </div>`;
     } catch (err) {
       console.error("Error fetching vehicles drawer:", err);
     }
@@ -17109,7 +17087,7 @@ window.escapeHtml = escapeHtml;
     const modal = get('globalImageZoomModal'), img = get('globalZoomModalImg');
     if (!modal || !img || !src) return;
     lastFocus = document.activeElement;
-    const scope = sourceImage?.closest('#captureDetailModal, #vtrTimeline, .vtr-card');
+    const scope = sourceImage?.closest('#captureDetailModal, #vtrTimeline, .vtr-review-row');
     const photos = scope ? Array.from(scope.querySelectorAll('img')).filter(photo => photo.getAttribute('src') && photo.getClientRects().length) : [];
     gallery = photos.map(photo => ({src:photo.currentSrc || photo.src, caption:photo.alt || 'Capture evidence'}));
     galleryIndex = photos.indexOf(sourceImage);
@@ -17695,8 +17673,7 @@ window.currentBatchViewMode = 'all';
 window.activeLocationPickerFileId = null;
 let locationPickerLeafletMap = null;
 let locationPickerMarker = null;
-let routeLeafletMap = null;
-let routeMapLayers = [];
+const uploadRouteState = { map: null, layers: [], version: 0 };
 let nominatimSearchTimer = null;
 const PANIPAT_NAKA_PRESETS = [{
   name: 'Panipat Toll Plaza (GT Road)',
@@ -18347,13 +18324,17 @@ window.openUploadVehicleDetailModalById = function (vehId) {
 window.filterRecentUploadResults = function (query) {
   window.renderRecentUploadResults(query);
 };
-window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadables = false) {
-  const sec = document.getElementById('uploadRouteMapSection');
-  const mapCanvas = document.getElementById('uploadRouteMap');
-  const badge = document.getElementById('routeMapPlateBadge');
-  const metrics = document.getElementById('routeMapMetrics');
-  const timeline = document.getElementById('routeTimelineBar');
+window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadables = false, sessionRoute = null) {
+  const sec = sessionRoute ? sessionRoute.sec : document.getElementById('uploadRouteMapSection');
+  const mapCanvas = sessionRoute ? sessionRoute.mapCanvas : document.getElementById('uploadRouteMap');
+  const badge = sessionRoute ? sessionRoute.badge : document.getElementById('routeMapPlateBadge');
+  const metrics = sessionRoute ? sessionRoute.metrics : document.getElementById('routeMapMetrics');
+  const timeline = sessionRoute ? sessionRoute.timeline : document.getElementById('routeTimelineBar');
   if (!sec || !mapCanvas) return;
+  const state = sessionRoute || uploadRouteState;
+  const version = ++state.version;
+  const isCurrent = () => version === state.version && sec.isConnected;
+  const detections = sessionRoute ? sessionRoute.detections : window.recentUploadBatchDetections;
   sec.style.display = 'block';
   const isUnreadableTarget = (plateNumber || '').toUpperCase() === 'UNREADABLE';
   if (badge) {
@@ -18367,16 +18348,16 @@ window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadab
             ` : ''}
         `;
   }
-  let sightings = window.recentUploadBatchDetections.filter(v => {
+  let sightings = detections.filter(v => {
     const p = (v.plate_number || v.final_plate || '').toUpperCase();
     return p === (plateNumber || '').toUpperCase();
   });
-  const unreadableSuspects = userIncludeUnreadables && plateNumber && !isUnreadableTarget ? window.recentUploadBatchDetections.filter(v => {
+  const unreadableSuspects = userIncludeUnreadables && plateNumber && !isUnreadableTarget ? detections.filter(v => {
     const p = (v.plate_number || v.final_plate || '').toUpperCase();
     return (p === 'UNREADABLE' || !p) && v.gps_coords && v.gps_coords.includes(',');
   }) : [];
   if (sightings.length === 0) {
-    sightings = window.recentUploadBatchDetections;
+    sightings = detections;
   }
   const pts = [];
   sightings.forEach(s => {
@@ -18414,7 +18395,22 @@ window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadab
     });
   }
   pts.sort((a, b) => new Date(a.time) - new Date(b.time));
-  if (timeline) {
+  if (sessionRoute) {
+    const sightingRows = [...sightings].sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at))
+      .map((sighting, index) => {
+        const crop = sighting.plate_crop_base64 || sighting.plate_pic_path;
+        const confidence = sighting.confidence == null ? '—' : escapeHtml(sighting.confidence) + '%';
+        return `<tr><td>${index + 1}</td><td>${escapeHtml(sighting.location || 'Checkpoint')}</td>
+          <td>${escapeHtml((sighting.captured_at || '—').replace('T', ' '))}</td><td>${confidence}</td>
+          <td>${crop ? `<img src="${escapeHtml(window.formatEvidenceImageSrc(crop))}" alt="Plate crop" loading="lazy" style="width:100px;height:48px;object-fit:contain;">` : '—'}</td></tr>`;
+      }).join('');
+    timeline.innerHTML = sightingRows ? `<table class="vtr-table" aria-label="Session sightings"><thead><tr>
+      <th scope="col">#</th><th scope="col">Checkpoint</th><th scope="col">Captured at</th>
+      <th scope="col">OCR confidence</th><th scope="col">Plate photo</th>
+      </tr></thead><tbody>${sightingRows}</tbody></table>` : '<p>No vehicle sightings in this session.</p>';
+    mapCanvas.hidden = !pts.length;
+    metrics.textContent = pts.length ? 'Loading map…' : 'No camera coordinates for these sightings.';
+  } else if (timeline) {
     timeline.innerHTML = pts.map((p, idx) => {
       const isFirst = idx === 0;
       const isLast = idx === pts.length - 1 && pts.length > 1;
@@ -18430,22 +18426,27 @@ window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadab
             `;
     }).join('');
   }
-  sec.scrollIntoView({
+  if (!sessionRoute) sec.scrollIntoView({
     behavior: 'smooth',
     block: 'nearest'
   });
   setTimeout(async () => {
-    if (!routeLeafletMap) {
-      routeLeafletMap = L.map('uploadRouteMap').setView([29.69, 76.99], 13);
+    if (!isCurrent() || (sessionRoute && !pts.length)) return;
+    if (!window.L) {
+      if (metrics) metrics.textContent = 'Map unavailable.';
+      return;
+    }
+    if (!state.map) {
+      state.map = L.map(mapCanvas).setView([29.69, 76.99], 13);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Haryana Police GIS'
-      }).addTo(routeLeafletMap);
+      }).addTo(state.map);
     } else {
-      routeLeafletMap.invalidateSize();
+      state.map.invalidateSize();
     }
-    routeMapLayers.forEach(l => routeLeafletMap.removeLayer(l));
-    routeMapLayers = [];
+    state.layers.forEach(l => state.map.removeLayer(l));
+    state.layers = [];
     if (pts.length === 0) {
       if (metrics) metrics.innerHTML = '<span>No GPS coordinates associated with this vehicle.</span>';
       return;
@@ -18468,7 +18469,7 @@ window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadab
       });
       const marker = L.marker([p.lat, p.lng], {
         icon: customIcon
-      }).addTo(routeLeafletMap);
+      }).addTo(state.map);
       const popupHtml = `
                 <div style="font-family:sans-serif; min-width:160px; font-size:0.875rem;">
                     <div style="font-weight:800; color:#ffffff; margin-bottom:4px;">Checkpoint #${idx + 1}: ${escapeHtml(p.location)}</div>
@@ -18478,15 +18479,16 @@ window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadab
                 </div>
             `;
       marker.bindPopup(popupHtml);
-      routeMapLayers.push(marker);
+      state.layers.push(marker);
     });
-    if (pts.length >= 2) {
+    if (new Set(latLngBounds.map(point => point.join(","))).size >= 2) {
       try {
         const osrmCoords = pts.map(p => `${p.lng},${p.lat}`).join(';');
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
         const rRes = await fetch(osrmUrl);
         if (rRes.ok) {
           const rData = await rRes.json();
+          if (!isCurrent()) return;
           if (rData.routes && rData.routes.length > 0) {
             const routeGeoJson = rData.routes[0].geometry;
             const distKm = (rData.routes[0].distance / 1000).toFixed(1);
@@ -18497,8 +18499,8 @@ window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadab
                 weight: 5,
                 opacity: 0.85
               }
-            }).addTo(routeLeafletMap);
-            routeMapLayers.push(routeLine);
+            }).addTo(state.map);
+            state.layers.push(routeLine);
             if (metrics) {
               metrics.innerHTML = `
                                 <span>🛣️ Road Distance: <strong>${distKm} km</strong></span>
@@ -18513,23 +18515,24 @@ window.renderTacticalRouteMap = async function (plateNumber, userIncludeUnreadab
           throw new Error("OSRM service status not OK");
         }
       } catch (routeErr) {
+        if (!isCurrent()) return;
         console.warn("OSRM routing unavailable, using direct trajectory polyline:", routeErr);
         const directLine = L.polyline(latLngBounds, {
           color: '#0369a1',
           weight: 4,
           dashArray: '6, 8',
           opacity: 0.85
-        }).addTo(routeLeafletMap);
-        routeMapLayers.push(directLine);
+        }).addTo(state.map);
+        state.layers.push(directLine);
         if (metrics) {
           metrics.innerHTML = `<span>📍 Sightings: <strong>${pts.length} Checkpoints</strong> (Corridor Plotted)</span>`;
         }
       }
     } else {
-      if (metrics) metrics.innerHTML = `<span>📍 Single Checkpoint Spotting (First Sighting)</span>`;
+      if (metrics) metrics.textContent = `1 mapped location · ${pts.length} sighting${pts.length === 1 ? "" : "s"}`;
     }
     if (latLngBounds.length > 0) {
-      routeLeafletMap.fitBounds(latLngBounds, {
+      state.map.fitBounds(latLngBounds, {
         padding: [50, 50]
       });
     }
@@ -18676,6 +18679,7 @@ window.fetchAndRenderUploadSessionsFeed = async function () {
       scopeBadgeText = `<span style="font-size:0.875rem; color:#10b981; background:rgba(16, 185, 129, 0.2); padding:2px 8px; border-radius:10px; border:1px solid rgba(16,185,129,0.4);">👮 Operator Scope: ${escapeHtml(data.scoped_operator || 'My Uploads')}</span>`;
     }
     if (badge) badge.innerHTML = `${sessions.length} Session${sessions.length !== 1 ? 's' : ''} &nbsp; ${scopeBadgeText}`;
+    closeSessionRoute();
     if (sessions.length === 0) {
       cont.innerHTML = `
                 <div class="empty-state" style="padding: 24px 12px; text-align: center; color: #52647c; background: rgba(241,245,249,0.5); border-radius: 8px;">
@@ -18684,41 +18688,30 @@ window.fetchAndRenderUploadSessionsFeed = async function () {
             `;
       return;
     }
-    cont.innerHTML = sessions.map((s, sIdx) => {
-      const isFirst = sIdx === 0;
+    const sessionRows = sessions.map(s => {
       const vehList = (s.vehicles || []).filter(window.isVisibleVehicleDetection);
       const fileList = s.files || [];
       return `
-                <div class="upload-session-card ${isFirst ? 'expanded' : ''}" id="session_card_${s.session_id}">
-                    <div class="session-card-header" onclick="window.toggleSessionExpand('${s.session_id}')">
-                        <div class="session-title-block">
-                            <div class="session-badge-strip">
-                                <span class="session-id-pill">SESSION #${s.id}</span>
-                                <span style="font-size:0.875rem; color:#64748b;">${escapeHtml(s.session_id)}</span>
-                            </div>
-                            <h3 class="session-title-text">${escapeHtml(s.session_title)}</h3>
-                            <div class="session-meta-row">
-                                <span class="session-meta-item">🕒 ${escapeHtml(s.time_display || s.timestamp)}</span>
-                                <span class="session-meta-item">📍 ${escapeHtml(s.district || 'Panipat')} (${escapeHtml(s.station || 'PHQ')})</span>
-                                <span class="session-meta-item">👮 ${escapeHtml(s.officer_name || 'Duty Officer')} <strong style="color:#64748b; font-weight:500;">(${escapeHtml(s.username || 'op')})</strong></span>
-                                <span class="badge" style="font-size:0.875rem; background:rgba(99,102,241,0.2); color:#4338ca; border:1px solid rgba(99,102,241,0.35); padding:1px 6px;">${escapeHtml(s.role || 'OPERATOR')}</span>
-                            </div>
+                <tr>
+                    <th scope="row">#${escapeHtml(s.id)}<br><small>${escapeHtml(s.session_id)}</small></th>
+                    <td>${escapeHtml(s.session_title)}</td>
+                    <td>${escapeHtml(s.time_display || s.timestamp)}</td>
+                    <td>${escapeHtml(s.district || 'Panipat')}<br><small>${escapeHtml(s.station || 'PHQ')}</small></td>
+                    <td>${escapeHtml(s.officer_name || 'Duty Officer')}<br><small>${escapeHtml(s.username || 'op')} · ${escapeHtml(s.role || 'OPERATOR')}</small></td>
+                    <td>${escapeHtml(s.total_files ?? fileList.length)}</td>
+                    <td>${escapeHtml(s.total_vehicles ?? vehList.length)}</td>
+                    <td>
+                        <button type="button" class="btn btn-secondary" popovertarget="session_actions_${escapeHtml(s.session_id)}"
+                            onclick="const menu = this.nextElementSibling; const rect = this.getBoundingClientRect(); menu.style.right = Math.max(8, window.innerWidth - rect.right) + 'px'; menu.style.top = rect.bottom + 6 + 'px'; menu.style.maxHeight = Math.max(0, window.innerHeight - rect.bottom - 14) + 'px'; if (window.innerHeight - rect.bottom < 160) { menu.style.top = 'auto'; menu.style.bottom = window.innerHeight - rect.top + 6 + 'px'; menu.style.maxHeight = Math.max(0, rect.top - 14) + 'px'; } else { menu.style.bottom = 'auto'; }">Actions ▾</button>
+                        <div popover class="session-actions" id="session_actions_${escapeHtml(s.session_id)}" data-session-id="${escapeHtml(s.session_id)}">
+                            <button type="button" class="btn btn-secondary" aria-controls="session_body_${escapeHtml(s.session_id)}" aria-expanded="false" onclick="this.parentElement.hidePopover(); window.toggleSessionExpand(this.parentElement.dataset.sessionId, this)">Show details</button>
+                            <button type="button" class="btn btn-secondary" onclick="this.parentElement.hidePopover(); window.loadSessionToMap(this.parentElement.dataset.sessionId, this.closest('tr'))">View route</button>
+                            <button type="button" class="btn btn-danger" onclick="this.parentElement.hidePopover(); window.deleteUploadSession(this.parentElement.dataset.sessionId)">Delete session</button>
                         </div>
-                        <div class="session-kpi-controls">
-                            <span class="kpi-stat-badge files">📁 ${s.total_files || fileList.length} Files</span>
-                            <span class="kpi-stat-badge vehicles">🚗 ${s.total_vehicles || vehList.length} Vehicles</span>
-
-                            <button type="button" class="btn btn-primary" onclick="event.stopPropagation(); window.loadSessionToMap('${s.session_id}')" style="padding:5px 12px; font-size:0.875rem; background:rgba(99, 102, 241, 0.25); color:#4338ca; border:1px solid rgba(99, 102, 241, 0.5); cursor:pointer; border-radius:6px;">
-                                🗺️ View Route
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.deleteUploadSession('${s.session_id}')" style="padding:5px 8px; font-size:0.875rem; background:rgba(239, 68, 68, 0.15); color:#b91c1c; border:1px solid rgba(239, 68, 68, 0.35); cursor:pointer; border-radius:6px;" title="Delete this session record">
-                                🗑️
-                            </button>
-                            <span class="session-expand-chevron">▼</span>
-                        </div>
-                    </div>
-
-                    <div class="session-card-body" id="session_body_${s.session_id}" style="display: ${isFirst ? 'block' : 'none'};">
+                    </td>
+                </tr>
+                <tr id="session_body_${escapeHtml(s.session_id)}" hidden>
+                    <td colspan="8"><div class="session-card-body" data-session-id="${escapeHtml(s.session_id)}">
                         <!-- Files Strip -->
                         <div class="session-files-bar">
                             <div class="session-files-bar-title">Uploaded Media Files in this Session:</div>
@@ -18770,7 +18763,7 @@ window.fetchAndRenderUploadSessionsFeed = async function () {
                                                     </span>
                                                     ${!isUnreadable ? `
                                                         <div style="margin-top:4px;">
-                                                            <button type="button" class="btn btn-sm btn-secondary" onclick="window.renderTacticalRouteMap('${escapeHtml(cleanPlate)}')" style="padding:2px 8px; font-size:0.875rem; cursor:pointer;">
+                                                            <button type="button" class="btn btn-sm btn-secondary" onclick="window.loadSessionToMap(this.closest('.session-card-body').dataset.sessionId, null, this.dataset.plate)" data-plate="${escapeHtml(cleanPlate)}" style="padding:2px 8px; font-size:0.875rem; cursor:pointer;">
                                                                 Map
                                                             </button>
                                                         </div>
@@ -18786,9 +18779,18 @@ window.fetchAndRenderUploadSessionsFeed = async function () {
 
                         </div>
                     </div>
-                </div>
+                    </td>
+                </tr>
             `;
     }).join('');
+    cont.innerHTML = `<div class="vtr-table-wrap"><table class="vtr-table" aria-label="Investigation Batch Sessions">
+        <thead><tr>
+            <th scope="col">Session</th><th scope="col">Title</th><th scope="col">Time</th>
+            <th scope="col">District and station</th><th scope="col">Operator</th>
+            <th scope="col">Files</th><th scope="col">Vehicles</th><th scope="col">Actions</th>
+        </tr></thead>
+        <tbody>${sessionRows}</tbody>
+    </table></div>`;
   } catch (e) {
     console.warn("Failed to load upload sessions:", e);
   }
@@ -18811,40 +18813,75 @@ window.deleteUploadSession = async function (sessionId) {
     alert("Error deleting upload session.");
   }
 };
-window.toggleSessionExpand = function (sessionId) {
-  const card = document.getElementById(`session_card_${sessionId}`);
+window.toggleSessionExpand = function (sessionId, button) {
   const body = document.getElementById(`session_body_${sessionId}`);
-  if (!body || !card) return;
-  const isHidden = body.style.display === 'none';
-  body.style.display = isHidden ? 'block' : 'none';
-  if (isHidden) {
-    card.classList.add('expanded');
-  } else {
-    card.classList.remove('expanded');
-  }
+  if (!body) return;
+  body.hidden = !body.hidden;
+  button.setAttribute('aria-expanded', String(!body.hidden));
+  button.textContent = body.hidden ? 'Show details' : 'Hide details';
 };
-window.loadSessionToMap = async function (sessionId) {
+let activeSessionRoute = null;
+
+function closeSessionRoute() {
+  if (!activeSessionRoute) return;
+  activeSessionRoute.version++;
+  activeSessionRoute.map?.remove();
+  activeSessionRoute.row.remove();
+  activeSessionRoute = null;
+}
+
+window.loadSessionToMap = async function (sessionId, sessionRow, selectedPlate) {
+  if (!sessionRow) {
+    const detailsRow = document.getElementById(`session_body_${sessionId}`);
+    sessionRow = detailsRow?.previousElementSibling;
+    if (sessionRow?.classList.contains('session-route-row')) sessionRow = sessionRow.previousElementSibling;
+  }
+  if (!sessionRow?.isConnected) return;
+  closeSessionRoute();
+  const row = sessionRow.parentElement.insertRow(sessionRow.sectionRowIndex + 1);
+  row.className = 'session-route-row';
+  const cell = row.insertCell();
+  cell.colSpan = sessionRow.cells.length;
+  cell.innerHTML = `<section class="session-route-panel" aria-label="Session route">
+    <div class="session-route-header">
+      <h3>Session route</h3>
+      <label>Vehicle <select disabled aria-label="Vehicle number plate"></select></label>
+      <button type="button" class="btn btn-secondary">Close route</button>
+    </div>
+    <p role="status">Loading session sightings…</p>
+    <div class="session-route-map" hidden></div>
+    <div class="session-route-sightings"></div>
+  </section>`;
+  const sec = cell.firstElementChild;
+  const select = sec.querySelector('select');
+  const route = {
+    row, sec, mapCanvas: sec.querySelector('.session-route-map'),
+    metrics: sec.querySelector('[role="status"]'), timeline: sec.querySelector('.session-route-sightings'),
+    map: null, layers: [], version: 0
+  };
+  activeSessionRoute = route;
+  sec.querySelector('button').addEventListener('click', closeSessionRoute);
+  sec.scrollIntoView({block: 'nearest'});
   try {
     const res = await fetch(`/api/unified/sessions/${encodeURIComponent(sessionId)}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    const s = data.session;
-    if (!s) return;
-    window.recentUploadBatchDetections = (s.vehicles || []).map(v => ({
-      ...v,
-      plate_number: v.plate_number || v.final_plate || 'UNREADABLE',
-      final_plate: v.final_plate || v.plate_number || 'UNREADABLE',
-      source_file: v.source_file || 'Session File',
-      location: v.location || 'Panipat Checkpoint',
-      gps_coords: v.gps_coords || '',
-      captured_at: v.captured_at || s.timestamp
+    if (!res.ok) throw new Error('Session could not load.');
+    const {session} = await res.json();
+    if (activeSessionRoute !== route || !row.isConnected) return;
+    if (!session) throw new Error('Session could not load.');
+    route.detections = (session.vehicles || []).map(vehicle => ({
+      ...vehicle,
+      plate_number: (vehicle.plate_number || vehicle.final_plate || 'UNREADABLE').toUpperCase(),
+      captured_at: vehicle.captured_at || session.timestamp
     }));
-    const verifiedVeh = (s.vehicles || []).find(v => v.plate_number && v.plate_number !== 'UNREADABLE');
-    const targetPlate = verifiedVeh ? verifiedVeh.plate_number || verifiedVeh.final_plate : '';
-    window.renderRecentUploadResults(targetPlate);
-    window.renderTacticalRouteMap(targetPlate);
-  } catch (e) {
-    console.error("Error loading session to map:", e);
+    const plates = [...new Set(route.detections.map(vehicle => vehicle.plate_number))];
+    plates.sort((a, b) => Number(a === 'UNREADABLE') - Number(b === 'UNREADABLE') || a.localeCompare(b));
+    plates.forEach(plate => select.add(new Option(plate, plate)));
+    if (plates.includes(selectedPlate?.toUpperCase())) select.value = selectedPlate.toUpperCase();
+    select.disabled = !plates.length;
+    select.addEventListener('change', () => window.renderTacticalRouteMap(select.value, false, route));
+    window.renderTacticalRouteMap(select.value, false, route);
+  } catch (error) {
+    if (activeSessionRoute === route) route.metrics.textContent = 'Could not load this session route. Close it and try again.';
   }
 };
 window.openUploadVehicleDetailModal = function (idx) {
